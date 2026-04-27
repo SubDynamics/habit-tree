@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 $good: #4caf50;
 $bad: #f44336;
 
@@ -8,12 +10,12 @@ $bad: #f44336;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 
   &--good {
-    background: lighten($good, 38%);
+    background: color.adjust($good, $lightness: 38%);
     border-left: 4px solid $good;
   }
 
   &--bad {
-    background: lighten($bad, 38%);
+    background: color.adjust($bad, $lightness: 38%);
     border-left: 4px solid $bad;
   }
 
