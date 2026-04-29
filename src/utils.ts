@@ -1,7 +1,11 @@
 import { CompletionRecord, FrequencyType } from './types';
 
 export function getTodayString(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export function getDailyStreak(
@@ -150,5 +154,13 @@ export function hasDoneToday(
   habitId: string,
   todayStr: string,
 ): boolean {
-  return completions.some((c) => c.habitId === habitId && c.date === todayStr);
+  const [y, mo, d] = todayStr.split('-').map(Number);
+  const todayStart = new Date(y, mo - 1, d).getTime(); // local midnight
+  return completions.some((c) => {
+    if (c.habitId !== habitId) return false;
+    if (c.completedAt !== undefined) {
+      return new Date(c.completedAt).getTime() >= todayStart;
+    }
+    return c.date === todayStr;
+  });
 }

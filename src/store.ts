@@ -50,7 +50,7 @@ export function recordCompletion(
     if (alreadyDone) return state;
   }
 
-  const newCompletion: CompletionRecord = { habitId, date };
+  const newCompletion: CompletionRecord = { habitId, date, completedAt: new Date().toISOString() };
   return { ...state, completions: [...state.completions, newCompletion] };
 }
 
