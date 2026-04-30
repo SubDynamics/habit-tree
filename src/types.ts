@@ -11,7 +11,8 @@ export interface Habit {
 
 export interface CompletionRecord {
   habitId: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (local date)
+  completedAt?: string; // ISO 8601 timestamp of when Done was pressed
 }
 
 export interface AppState {

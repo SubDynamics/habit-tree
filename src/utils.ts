@@ -1,9 +1,35 @@
 import { CompletionRecord, FrequencyType } from './types';
 
+/**
+ * Returns the current local calendar date as a `YYYY-MM-DD` string.
+ *
+ * Uses local date components (`getFullYear`, `getMonth`, `getDate`) rather than
+ * parsing an ISO string, so the value reflects the user's timezone rather than UTC.
+ */
 export function getTodayString(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
+/**
+ * Calculates the current daily streak for a set of completions.
+ *
+ * The streak is the number of consecutive calendar days (ending either today or
+ * yesterday) on which the habit was completed.
+ *
+ * - If the habit was completed today, the streak starts from today and walks
+ *   backwards through consecutive days.
+ * - If the habit was not completed today, the streak starts from yesterday and
+ *   walks backwards (the streak is still "alive" until midnight).
+ * - A gap of two or more days resets the streak to 0.
+ *
+ * @param completions - All completion records for the habit.
+ * @param todayStr - Local calendar date in `YYYY-MM-DD` format.
+ * @returns The current streak length in days (0 if the streak is broken).
+ */
 export function getDailyStreak(
   completions: CompletionRecord[],
   todayStr: string,
@@ -22,6 +48,15 @@ export function getDailyStreak(
   return streak;
 }
 
+/**
+ * Returns the longest consecutive-day streak ever recorded in the given completions.
+ *
+ * Duplicate dates (e.g. multiple completions on the same day for an interval habit)
+ * are skipped without resetting the running count.
+ *
+ * @param completions - All completion records for the habit.
+ * @returns The personal-best streak length in days (0 if there are no completions).
+ */
 export function getPersonalBestStreak(completions: CompletionRecord[]): number {
   if (completions.length === 0) return 0;
   const sorted = [...completions].sort((a, b) => a.date.localeCompare(b.date));
@@ -43,6 +78,19 @@ export function getPersonalBestStreak(completions: CompletionRecord[]): number {
   return best;
 }
 
+/**
+ * Counts how many completions fall within the current interval period.
+ *
+ * - `weekly`: Mon–Sun week containing `referenceDate`.
+ * - `monthly`: calendar month containing `referenceDate`.
+ * - `yearly`: calendar year containing `referenceDate`.
+ * - `daily`: always returns 0 (daily habits use streak logic instead).
+ *
+ * @param completions - All completion records for the habit.
+ * @param frequencyType - The habit's frequency type.
+ * @param referenceDate - The date that defines which interval to inspect (typically today at 00:00 local).
+ * @returns The number of completions recorded within the current interval.
+ */
 export function getCurrentIntervalCompletions(
   completions: CompletionRecord[],
   frequencyType: FrequencyType,
@@ -76,6 +124,21 @@ export function getCurrentIntervalCompletions(
   }).length;
 }
 
+/**
+ * Derives the display colour for a daily-frequency habit panel.
+ *
+ * | Condition | Colour |
+ * |---|---|
+ * | Current streak equals or exceeds the personal best | `'good'` |
+ * | Last completion was 3 or more days ago | `'bad'` |
+ * | Otherwise | `'neutral'` |
+ *
+ * @param streak - The current daily streak (from {@link getDailyStreak}).
+ * @param personalBest - The all-time best streak (from {@link getPersonalBestStreak}).
+ * @param completions - All completion records for the habit (used to find the most recent date).
+ * @param todayStr - Local calendar date in `YYYY-MM-DD` format.
+ * @returns `'good'`, `'bad'`, or `'neutral'`.
+ */
 export function getDailyPanelColor(
   streak: number,
   personalBest: number,
@@ -97,6 +160,22 @@ export function getDailyPanelColor(
   return 'neutral';
 }
 
+/**
+ * Derives the display colour for an interval-frequency (weekly/monthly/yearly) habit panel.
+ *
+ * | Condition | Colour |
+ * |---|---|
+ * | Target completions already reached for this interval | `'good'` |
+ * | Not enough days remain to reach the target | `'bad'` |
+ * | Completion pace is ahead of the linear target | `'good'` |
+ * | Otherwise | `'neutral'` |
+ *
+ * @param completions - All completion records for the habit.
+ * @param frequencyType - The habit's frequency type (`'weekly'`, `'monthly'`, or `'yearly'`).
+ * @param target - The required number of completions for the interval.
+ * @param referenceDate - The date that defines which interval to inspect (typically today at 00:00 local).
+ * @returns `'good'`, `'bad'`, or `'neutral'`.
+ */
 export function getIntervalPanelColor(
   completions: CompletionRecord[],
   frequencyType: FrequencyType,
@@ -145,10 +224,32 @@ export function getIntervalPanelColor(
   return 'neutral';
 }
 
+/**
+ * Determines whether a habit has been marked done since local midnight today.
+ *
+ * When a completion record has a `completedAt` ISO timestamp, that value is
+ * compared against local midnight (`new Date(year, month - 1, day)`) to give
+ * an accurate per-timezone reset at 00:00.  Records created before this field
+ * was introduced fall back to a simple date-string comparison for backwards
+ * compatibility.
+ *
+ * @param completions - All completion records for the habit.
+ * @param habitId - The ID of the habit to check.
+ * @param todayStr - Local calendar date in `YYYY-MM-DD` format.
+ * @returns `true` if the habit was completed on or after local midnight today.
+ */
 export function hasDoneToday(
   completions: CompletionRecord[],
   habitId: string,
   todayStr: string,
 ): boolean {
-  return completions.some((c) => c.habitId === habitId && c.date === todayStr);
+  const [y, mo, d] = todayStr.split('-').map(Number);
+  const todayStart = new Date(y, mo - 1, d).getTime(); // local midnight
+  return completions.some((c) => {
+    if (c.habitId !== habitId) return false;
+    if (c.completedAt !== undefined) {
+      return new Date(c.completedAt).getTime() >= todayStart;
+    }
+    return c.date === todayStr;
+  });
 }

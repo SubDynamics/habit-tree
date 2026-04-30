@@ -9,13 +9,19 @@ import {
 } from '../../utils';
 import { CompletionRecord } from '../../types';
 
-function rec(habitId: string, date: string): CompletionRecord {
-  return { habitId, date };
+function rec(habitId: string, date: string, completedAt?: string): CompletionRecord {
+  return completedAt !== undefined ? { habitId, date, completedAt } : { habitId, date };
 }
 
 describe('getTodayString', () => {
   it('returns YYYY-MM-DD format', () => {
     expect(getTodayString()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('returns local date, not UTC date', () => {
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    expect(getTodayString()).toBe(localDate);
   });
 });
 
@@ -158,13 +164,37 @@ describe('getIntervalPanelColor', () => {
 });
 
 describe('hasDoneToday', () => {
-  it('returns true when done today', () => {
+  it('returns true when done today (date-only record)', () => {
     const completions = [rec('h1', '2024-01-10')];
     expect(hasDoneToday(completions, 'h1', '2024-01-10')).toBe(true);
   });
 
-  it('returns false when not done today', () => {
+  it('returns false when not done today (date-only record)', () => {
     const completions = [rec('h1', '2024-01-09')];
+    expect(hasDoneToday(completions, 'h1', '2024-01-10')).toBe(false);
+  });
+
+  it('returns true when completedAt is after local midnight today', () => {
+    // Build a timestamp 1 hour after local midnight on 2024-01-10
+    const localMidnight = new Date(2024, 0, 10).getTime(); // Jan 10, 00:00 local
+    const afterMidnight = new Date(localMidnight + 3600_000).toISOString(); // +1 h
+    const completions = [rec('h1', '2024-01-10', afterMidnight)];
+    expect(hasDoneToday(completions, 'h1', '2024-01-10')).toBe(true);
+  });
+
+  it('returns false when completedAt is before local midnight today', () => {
+    // Build a timestamp 1 hour before local midnight on 2024-01-10 (i.e. yesterday 23:00)
+    const localMidnight = new Date(2024, 0, 10).getTime(); // Jan 10, 00:00 local
+    const beforeMidnight = new Date(localMidnight - 3600_000).toISOString(); // -1 h
+    const completions = [rec('h1', '2024-01-09', beforeMidnight)];
+    expect(hasDoneToday(completions, 'h1', '2024-01-10')).toBe(false);
+  });
+
+  it('prefers completedAt over date field when present', () => {
+    // date says today but completedAt was 1 hour before local midnight — should be false
+    const localMidnight = new Date(2024, 0, 10).getTime();
+    const beforeMidnight = new Date(localMidnight - 3600_000).toISOString();
+    const completions = [rec('h1', '2024-01-10', beforeMidnight)];
     expect(hasDoneToday(completions, 'h1', '2024-01-10')).toBe(false);
   });
 });
