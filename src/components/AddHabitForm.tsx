@@ -2,17 +2,38 @@ import { useState } from 'react';
 import { FrequencyType, Habit } from '../types';
 import './AddHabitForm.scss';
 
+/**
+ * Props for `AddHabitForm` component.
+ *
+ * @property onSubmit - Called with the new habit data (excluding `id` and `createdAt`) when the form is submitted.
+ * @property onCancel - Called when the user cancels adding a new habit.
+ */
 interface AddHabitFormProps {
   onSubmit: (data: Omit<Habit, 'id' | 'createdAt'>) => void;
   onCancel: () => void;
 }
 
+/**
+ * `AddHabitForm` renders a modal-like form to create a new habit.
+ * It manages local form state for title, description, frequency type and
+ * frequency target. On submit it validates required fields and passes a
+ * normalized payload to `onSubmit`.
+ *
+ * Internal function:
+ * - `handleSubmit`: prevents default, validates title, normalizes the payload
+ *   (ensuring daily habits always have `frequencyTarget` of 1) and calls
+ *   `onSubmit` with the new habit data.
+ */
 export default function AddHabitForm({ onSubmit, onCancel }: AddHabitFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [frequencyType, setFrequencyType] = useState<FrequencyType>('daily');
   const [frequencyTarget, setFrequencyTarget] = useState(1);
 
+  /**
+   * Handle form submission.
+   * @param e - Form event from the browser.
+   */
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
